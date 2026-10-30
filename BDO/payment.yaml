@@ -1,0 +1,22 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "payment"
+  rules:
+    - actions: ["create"]
+      effect: EFFECT_ALLOW
+      roles: ["maker"]
+
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["maker", "checker"]
+
+    - actions: ["approve"]
+      effect: EFFECT_ALLOW
+      roles: ["checker"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: request.resource.attr.amount <= request.principal.attr.approvalLimit
+              - expr: request.resource.attr.createdBy != request.principal.id

@@ -1,0 +1,38 @@
+name: BDO_Maker_Checker_Suite
+description: Tests for the maker-checker payment rules
+principals:
+  alice_maker:
+    id: "alice"
+    roles: ["maker"]
+  bob_checker:
+    id: "bob"
+    roles: ["checker"]
+    attr:
+      approvalLimit: 500000
+
+resources:
+  valid_payment:
+    id: "PAY-001"
+    kind: "payment"
+    attr: { amount: 100000, createdBy: "alice" }
+  over_limit_payment:
+    id: "PAY-002"
+    kind: "payment"
+    attr: { amount: 2000000, createdBy: "alice" }
+  self_approval_payment:
+    id: "PAY-003"
+    kind: "payment"
+    attr: { amount: 1000, createdBy: "bob" }
+
+tests:
+  - name: Bob can approve Alice's payment within his limit
+    input: { principals: [bob_checker], resources: [valid_payment], actions: [approve] }
+    expected: [ { principal: bob_checker, resource: valid_payment, actions: { approve: EFFECT_ALLOW } } ]
+
+  - name: Bob CANNOT approve a payment over his limit
+    input: { principals: [bob_checker], resources: [over_limit_payment], actions: [approve] }
+    expected: [ { principal: bob_checker, resource: over_limit_payment, actions: { approve: EFFECT_DENY } } ]
+
+  - name: Bob CANNOT approve his own payment
+    input: { principals: [bob_checker], resources: [self_approval_payment], actions: [approve] }
+    expected: [ { principal: bob_checker, resource: self_approval_payment, actions: { approve: EFFECT_DENY } } ]
