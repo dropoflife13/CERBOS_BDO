@@ -1,0 +1,176 @@
+---
+# yaml-language-server: $schema=https://api.cerbos.dev/v1/TestSuite.schema.json
+name: BDOFundTransferTestSuite
+description: Tests for BDO Fund Transfer authorization rules and dual-approval
+principals:
+  juan_retail:
+    id: juan
+    roles:
+      - RETAIL_CUSTOMER
+    attr:
+      mfa_verified: true
+  pedro_no_mfa:
+    id: pedro
+    roles:
+      - RETAIL_CUSTOMER
+    attr:
+      mfa_verified: false
+  carlos_manager:
+    id: carlos
+    roles:
+      - BRANCH_MANAGER
+    attr:
+      approval_limit_php: 1000000
+      device_managed: true
+  carlos_unmanaged:
+    id: carlos_alt
+    roles:
+      - BRANCH_MANAGER
+    attr:
+      approval_limit_php: 1000000
+      device_managed: false
+  bot_agent:
+    id: ai-agent-01
+    roles:
+      - AI_AGENT
+
+resources:
+  juan_transfer:
+    kind: "bdo:fund_transfer"
+    id: TX-001
+    attr:
+      account_owner_id: juan
+      amount_php: 5000
+      daily_limit_php: 50000
+  juan_excess_transfer:
+    kind: "bdo:fund_transfer"
+    id: TX-002
+    attr:
+      account_owner_id: juan
+      amount_php: 60000
+      daily_limit_php: 50000
+  pedro_transfer:
+    kind: "bdo:fund_transfer"
+    id: TX-003
+    attr:
+      account_owner_id: pedro
+      amount_php: 5000
+      daily_limit_php: 50000
+  maria_transfer:
+    kind: "bdo:fund_transfer"
+    id: TX-004
+    attr:
+      initiated_by_principal_id: maria
+      amount_php: 500000
+      status: PENDING_CHECKER_APPROVAL
+  carlos_own_transfer:
+    kind: "bdo:fund_transfer"
+    id: TX-005
+    attr:
+      initiated_by_principal_id: carlos
+      amount_php: 500000
+      status: PENDING_CHECKER_APPROVAL
+  ai_transfer:
+    kind: "bdo:fund_transfer"
+    id: TX-006
+    attr:
+      amount_php: 25000
+
+tests:
+  - name: Retail Customer can initiate transfer within daily limit with MFA
+    input:
+      principals:
+        - juan_retail
+      resources:
+        - juan_transfer
+      actions:
+        - initiate
+    expected:
+      - principal: juan_retail
+        resource: juan_transfer
+        actions:
+          initiate: EFFECT_ALLOW
+
+  - name: Retail Customer CANNOT initiate transfer exceeding daily limit
+    input:
+      principals:
+        - juan_retail
+      resources:
+        - juan_excess_transfer
+      actions:
+        - initiate
+    expected:
+      - principal: juan_retail
+        resource: juan_excess_transfer
+        actions:
+          initiate: EFFECT_DENY
+
+  - name: Retail Customer CANNOT initiate transfer without MFA
+    input:
+      principals:
+        - pedro_no_mfa
+      resources:
+        - pedro_transfer
+      actions:
+        - initiate
+    expected:
+      - principal: pedro_no_mfa
+        resource: pedro_transfer
+        actions:
+          initiate: EFFECT_DENY
+
+  - name: Branch Manager on managed device can approve valid transfer
+    input:
+      principals:
+        - carlos_manager
+      resources:
+        - maria_transfer
+      actions:
+        - approve_transfer
+    expected:
+      - principal: carlos_manager
+        resource: maria_transfer
+        actions:
+          approve_transfer: EFFECT_ALLOW
+
+  - name: Branch Manager CANNOT self-approve own initiated transfer
+    input:
+      principals:
+        - carlos_manager
+      resources:
+        - carlos_own_transfer
+      actions:
+        - approve_transfer
+    expected:
+      - principal: carlos_manager
+        resource: carlos_own_transfer
+        actions:
+          approve_transfer: EFFECT_DENY
+
+  - name: Branch Manager CANNOT approve from unmanaged device
+    input:
+      principals:
+        - carlos_unmanaged
+      resources:
+        - maria_transfer
+      actions:
+        - approve_transfer
+    expected:
+      - principal: carlos_unmanaged
+        resource: maria_transfer
+        actions:
+          approve_transfer: EFFECT_DENY
+
+  - name: Autonomous AI Agent is DENIED from executing high value transfer
+    input:
+      principals:
+        - bot_agent
+      resources:
+        - ai_transfer
+      actions:
+        - initiate
+    expected:
+      - principal: bot_agent
+        resource: ai_transfer
+        actions:
+          initiate: EFFECT_DENY

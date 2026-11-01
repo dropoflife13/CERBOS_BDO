@@ -1,0 +1,43 @@
+---
+# yaml-language-server: $schema=https://api.cerbos.dev/v1/Policy.schema.json
+apiVersion: "api.cerbos.dev/v1"
+resourcePolicy:
+  version: "default"
+  resource: "bdo:fund_transfer"
+  importDerivedRoles:
+    - bdo_banking_derived_roles
+  rules:
+    - name: retail-owner-transfer-within-limit
+      actions: ["initiate"]
+      effect: EFFECT_ALLOW
+      roles: ["RETAIL_CUSTOMER"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: R.attr.account_owner_id == P.id
+              - expr: R.attr.amount_php <= R.attr.daily_limit_php
+              - expr: P.attr.mfa_verified == true
+
+    - name: high-value-maker-checker-approval
+      actions: ["approve_transfer"]
+      effect: EFFECT_ALLOW
+      derivedRoles: ["dual_approval_eligible_checker"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: R.attr.amount_php <= P.attr.approval_limit_php
+              - expr: R.attr.status == "PENDING_CHECKER_APPROVAL"
+
+    - name: block-autonomous-nhi-high-value-transfer
+      actions: ["initiate", "approve_transfer"]
+      effect: EFFECT_DENY
+      roles: ["AI_AGENT", "SERVICE_ACCOUNT"]
+      condition:
+        match:
+          expr: R.attr.amount_php > 10000
+      output:
+        when:
+          ruleActivated: |-
+            {"violation": "nhi-limit-exceeded", "principal_id": P.id}

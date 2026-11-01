@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://api.cerbos.dev/v1/DerivedRoles.schema.json
+apiVersion: "api.cerbos.dev/v1"
+derivedRoles:
+  name: bdo_banking_derived_roles
+  definitions:
+    - name: assigned_branch_officer
+      parentRoles: ["BRANCH_OFFICER", "BRANCH_MANAGER"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: P.attr.branch_code == R.attr.home_branch_code
+              - expr: P.attr.on_active_shift == true
+              - expr: P.attr.device_managed == true
+
+    - name: dual_approval_eligible_checker
+      parentRoles: ["BRANCH_MANAGER", "CORPORATE_APPROVER"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: P.id != R.attr.initiated_by_principal_id
+              - expr: P.attr.device_managed == true

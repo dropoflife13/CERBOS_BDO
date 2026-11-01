@@ -1,0 +1,4 @@
+# Editor agent folders
+.*
+!.gitignore
+skills-lock.json
